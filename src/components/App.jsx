@@ -1,117 +1,86 @@
-import React, { Component } from 'react';
-import { nanoid } from 'nanoid';
+import { useDispatch, useSelector } from 'react-redux';
+import { useEffect } from 'react';
+import { getUser, refreshUser } from 'redux/auth/auth-operations';
+import { Route, Routes } from 'react-router-dom';
+import { PublicRoute } from './PublicRoute';
+import { PrivateRoute } from './PrivateRoute';
+import { Layout } from './Layout/Layout';
+import 'react-toastify/dist/ReactToastify.css';
+import { getIsRefreshing } from 'redux/auth/auth-selectors';
+import { ThemeSwitching } from './styles/ThemeSwitching';
+import { useAuth } from 'hooks';
+import { dayInfo } from 'redux/day/day-operations';
+import { GlobalStylesPrivate } from './styles/GlobalStylePrivate.styled';
+import { GlobalStylePublic } from './GlobalStylePublic/GlobalStylePublic.styled';
+import Loader from './Loader/Loader';
+import Login from 'pages/Login';
+import Register from 'pages/Register';
+import Home from 'pages/Home';
+import Calculator from 'pages/Calculator';
+import Diary from 'pages/Diary';
+import PageNotFound from './PageNotFound/PageNotFound';
 
-import { ContactForm } from 'components/ContactForm/ContactForm';
-import ContactList from './ContactList';
-import Filter from './Filter';
+export const App = () => {
+  const { isLoggedIn } = useAuth();
+  const dispatch = useDispatch();
+  const normalizedSelectedDate = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    dispatch(refreshUser())
+      .unwrap()
+      .then(() => dispatch(getUser()))
+      .then(() => dispatch(dayInfo({ date: normalizedSelectedDate })));
+  }, [dispatch, normalizedSelectedDate]);
 
-export class App extends Component {
-  // state = {
-  //   contacts: [
-  //     { id: 'id-1', name: 'Juan Batista', number: '809-935-5609' },
-  //     { id: 'id-2', name: 'Lindsay Mathews', number: '603-512-2343' },
-  //     { id: 'id-3', name: 'Arturo Souverain', number: '809-815-5050' },
-  //   ],
-  //   filter: '',
-  // };
-  state = {
-    contacts: [],
-    filter: '',
-  };
+  const isRefreshing = useSelector(getIsRefreshing);
 
-  componentDidMount() {
-    const myContacts = JSON.parse(localStorage.getItem('contacts'));
-    if (myContacts) {
-      this.setState({ contacts: myContacts });
-    }
-  }
-
-  // componentDidMount() {
-  //   if (
-  //     JSON.parse(localStorage.getItem('contacts')) !== this.state.contacts ??
-  //     0
-  //   ) {
-  //     return this.setState({
-  //       contacts: JSON.parse(localStorage.getItem('contacts')),
-  //     });
-  //   }
-  // }
-
-  componentDidUpdate(_, prevState) {
-    const { contacts } = this.state;
-    if (contacts !== prevState.contacts) {
-      localStorage.setItem('contacts', JSON.stringify(contacts));
-    }
-  }
-
-  handleChange = evt => {
-    const { name, value } = evt.target;
-    this.setState({
-      [name]: value,
-    });
-  };
-
-  addContact = (name, number) => {
-    const newContact = {
-      id: 'id-' + nanoid(2),
-      name,
-      number,
-    };
-
-    return this.setState(prevState => ({
-      contacts: [newContact, ...prevState.contacts],
-    }));
-  };
-
-  handleClick = id => {
-    this.setState(prevState => ({
-      contacts: prevState.contacts.filter(contact => contact.id !== id),
-    }));
-  };
-
-  findContact = () => {
-    const { contacts, filter } = this.state;
-    const normalizedFilter = filter.toLowerCase();
-
-    return contacts.filter(contact =>
-      contact.name.toLocaleLowerCase().includes(normalizedFilter)
-    );
-  };
-
-  render() {
-    const { contacts, filter } = this.state;
-
-    return (
-      <div
-        style={{
-          display: 'block',
-          textAlign: 'center',
-          marginBottom: '20px',
-          color: '#010101',
-        }}
-        className="section"
-      >
-        <h1 className="hero_title">Phonebook</h1>
-
-        <ContactForm
-          addContact={this.addContact}
-          contacts={contacts}
-        ></ContactForm>
-
-        {/* <h2 className='title'>Contacts</h2> */}
-
-        {contacts.length !== 0 ? (
-          <>
-            <Filter stateName={filter} onChange={this.handleChange}></Filter>
-            <ContactList
-              contacts={this.findContact()}
-              onClick={this.handleClick}
-            ></ContactList>
-          </>
-        ) : (
-          <p>Looks like you don`t have any contacts. Please add new contact.</p>
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <ThemeSwitching>
+      {isRefreshing ? (
+        <Loader />
+      ) : (
+        <>
+          {isLoggedIn ? <GlobalStylesPrivate /> : <GlobalStylePublic />}
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Home />} />
+              <Route
+                path="/registration"
+                element={
+                  <PublicRoute restricted>
+                    <Register />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute restricted>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/calculator"
+                element={
+                  <PrivateRoute>
+                    <Calculator />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/diary"
+                element={
+                  <PrivateRoute>
+                    <Diary />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="*" element={<PageNotFound />} />
+            </Route>
+          </Routes>
+          {/* </Suspense> */}
+        </>
+      )}
+    </ThemeSwitching>
+  );
+};
